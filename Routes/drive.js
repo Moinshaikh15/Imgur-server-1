@@ -13,7 +13,6 @@ const SCOPES = [
 ];
 const CREDENTIALS_PATH = path.join(process.cwd(), "service.json");
 
-
 router.get("/:id", async (req, res) => {
   let folderId = req.params.id;
 
@@ -29,25 +28,40 @@ router.get("/:id", async (req, res) => {
     auth,
   });
 
+  let nextPageToken = "";
   var query = `'${folderId}' in parents and trashed = false`;
-  drive.files.list(
-    { q: query, fields: "files(*)" },
-    function (error, response) {
-      if (error) {
-        return res.send(error);
+  let resultArr = [];
+
+  let callback = () => {
+    drive.files.list(
+      {
+        q: query,
+        pageToken: nextPageToken,
+        fields: "files(name,webContentLink,webViewLink),nextPageToken",
+      },
+      function (error, response) {
+        if (error) {
+          return res.send(error);
+        }
+        response.data.files.forEach(function (item) {
+          let obj = {
+            name: item.name,
+            downloadLink: item.webContentLink,
+            viewLink: item.webViewLink,
+          };
+          resultArr.push(obj);
+        });
+        if (response.data.nextPageToken) {
+          nextPageToken = response.data.nextPageToken;
+          callback();
+        } else {
+          console.log("result array Sent Successfully");
+          return res.json(resultArr);
+        }
       }
-      //console.log(response);
-      let resultArr = [];
-      response.data.files.forEach(function (item) {
-        let obj = {};
-        obj.name = item.name;
-        obj.downloadLink = item.webContentLink;
-        obj.viewLink = item.webViewLink;
-        resultArr.push(obj);
-      });
-      return res.json(resultArr);
-    }
-  );
+    );
+  };
+  callback();
 });
 
 module.exports = router;
